@@ -1,0 +1,56 @@
+version: '3.7'
+networks:
+  monitoring:
+    driver: bridge
+services:
+  prometheus:
+    image: prom/prometheus:v2.29.1
+    container_name: prometheus
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./prometheus/prometheus-rules.yml:/etc/prometheus/prometheus-rules.yml
+    ports:
+      - 9090:9090
+    networks:
+      - monitoring
+  cadvisor:
+    image: google/cadvisor:v0.32.0
+    container_name: cadvisor
+    ports:
+      - 4194:4194
+    command:
+      - '-port=4194'
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:rw
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    depends_on:
+      - redis
+  redis:
+    image: redis:6.2.5
+    container_name: redis
+    ports:
+      - 6379:6379
+  node_exporter:
+    image: prom/node-exporter:v1.2.2
+    container_name: node_exporter
+    command:
+      - "--path.rootfs=/host"
+    ports:
+      - 9100:9100
+    restart: unless-stopped
+    volumes:
+      - "/:/host:ro,rslave"
+  grafana:
+    image: grafana/grafana:8.1.2
+    container_name: grafana
+    env_file:
+      - .env
+    volumes:
+      - ./grafana/custom.ini:/etc/grafana/custom.ini
+      - ./grafana/provisioning:/etc/grafana/provisioning
+    environment:
+      - GF_PATHS_CONFIG=/etc/grafana/custom.ini
+    ports:
+       - ${PORT:-3002}:${PORT:-3002}
